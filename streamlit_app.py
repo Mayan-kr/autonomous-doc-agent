@@ -242,3 +242,21 @@ if generate:
         for section in done_event["sections"]:
             with st.expander(section["title"], expanded=False):
                 st.markdown(section["content"])
+
+
+# --------------------------------------------------------------------------- #
+# Footer
+# --------------------------------------------------------------------------- #
+st.markdown(
+    """
+    <hr style="margin-top:2.5rem; border:none; border-top:1px solid #2a2d3a;">
+    <div style="text-align:center; color:#8b8fa3; font-size:0.85rem;
+                padding:0.5rem 0 1rem;">
+        Made with ❤️ by
+        <a href="https://github.com/Mayan-kr" target="_blank"
+           style="color:#7C5CFF; text-decoration:none; font-weight:600;">
+           Mayan</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)

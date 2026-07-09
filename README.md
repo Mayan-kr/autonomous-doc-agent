@@ -28,38 +28,84 @@ It returns JSON (the plan + a download link) and serves the file at
 
 ## Architecture
 
+The system is a thin **HTTP layer** over an **agent core** that reasons in four
+stages, backed by a **reliability layer** that every model call passes through.
+Layers only depend downward, and the LLM's output is validated against typed
+contracts before it's ever trusted.
+
+```mermaid
+flowchart TB
+    Client([Client])
+
+    subgraph HTTP["🌐 HTTP Layer — app/main.py"]
+        Agent["POST /agent"]
+        Download["GET /download/:id"]
+    end
+
+    subgraph Core["🧠 Agent Core — app/orchestrator.py"]
+        direction TB
+        P["1 · PLAN&nbsp;&nbsp;·&nbsp;&nbsp;make_plan()<br/><small>LLM writes its own task list</small>"]
+        R["2 · REFLECT ★&nbsp;&nbsp;·&nbsp;&nbsp;reflect_on_plan()<br/><small>2nd LLM pass critiques and rewrites the plan</small>"]
+        E["3 · EXECUTE&nbsp;&nbsp;·&nbsp;&nbsp;write_section() per section<br/><small>prior section titles fed back in for coherence</small>"]
+        A["4 · ASSEMBLE&nbsp;&nbsp;·&nbsp;&nbsp;build_document()<br/><small>python-docx renders the styled .docx</small>"]
+        P --> R --> E --> A
+    end
+
+    LLM["🛡️ Reliability — app/llm.py<br/><small>chat / chat_json · 3 retries + backoff<br/>model fallback · JSON salvage</small>"]
+    Groq[("Groq API<br/><small>Llama 3.3 70B → 3.1 8B</small>")]
+    Docx[["📄 output/&lt;id&gt;.docx"]]
+
+    Client -->|"request"| Agent
+    Agent --> P
+    P -. "LLM call" .-> LLM
+    R -. "LLM call" .-> LLM
+    E -. "LLM call" .-> LLM
+    LLM <-->|"retry + fallback"| Groq
+    A --> Docx
+    A ==>|"plan + reflection_notes + download_url"| Client
+    Client -->|"GET /download/:id"| Download
+    Download --> Docx
+
+    classDef http fill:#e8f0fe,stroke:#4285f4,color:#111;
+    classDef core fill:#e6f4ea,stroke:#34a853,color:#111;
+    classDef rel  fill:#fff3e0,stroke:#fb8c00,color:#111;
+    class Agent,Download http;
+    class P,R,E,A core;
+    class LLM rel;
 ```
-                POST /agent {"request": "..."}
-                          │
-                          ▼
-        ┌──────────────── orchestrator.run_agent ────────────────┐
-        │                                                          │
-        │   1. make_plan()      → LLM writes its own task list     │
-        │   2. reflect_on_plan()→ LLM critiques & improves it  ★   │
-        │   3. write_section()  → LLM writes each section (loop)   │
-        │   4. build_document() → python-docx renders the .docx    │
-        │                                                          │
-        └──────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-        JSON response  +  GET /download/{id} → file.docx
 
-  ★ = the mandatory "one real engineering improvement"
+> ★ = the mandatory *"one real engineering improvement"* (the reflection pass — see below).
+> **Solid arrows** = control/data flow · **dotted** = every model call funnels through the reliability layer.
 
-  llm.py  wraps every model call with retry + model fallback, so a single
-          flaky API call never crashes a run.
-```
+**Request lifecycle:** `POST /agent` → validate body (`AgentRequest`) → `run_agent`
+runs PLAN → REFLECT → EXECUTE → ASSEMBLE → response carries the final `Plan`,
+`reflection_notes`, and a `download_url`. A follow-up `GET /download/{id}` streams
+the `.docx` from `output/`.
 
-| File | Responsibility |
-|------|----------------|
-| `app/main.py` | FastAPI endpoints: `POST /agent`, `GET /download/{id}`, `GET /health` |
-| `app/orchestrator.py` | The agent loop: plan → reflect → execute → assemble |
-| `app/llm.py` | Groq client with retry + fallback + JSON parsing |
-| `app/docgen.py` | `python-docx` document generation (headings, bullets, tables) |
-| `app/schemas.py` | Pydantic models — validates the LLM's plan, not just trusts it |
-| `demo.py` | Runs both required test cases without a server |
+### Design principles
 
-**Tech:** Python · FastAPI · Groq (Llama 3.3 70B, free tier) · python-docx · Pydantic.
+- **The LLM plans; the code enforces.** The agent decides *what* the document is,
+  but every plan is parsed into Pydantic models (`Plan`, `PlanStep`) — malformed
+  output is rejected, not silently executed.
+- **Fail soft, never crash.** Reflection degrades to the original plan on error;
+  `llm.py` retries and falls back before giving up; `/agent` returns a clean 500
+  instead of leaking a stack trace.
+- **One direction of dependency.** HTTP → core → reliability. `docgen` and
+  `schemas` are leaf modules with no upward imports, so each layer is testable in
+  isolation (`demo.py` exercises the core with no server).
+
+### Modules
+
+| File | Layer | Responsibility |
+|------|-------|----------------|
+| `app/main.py` | HTTP | FastAPI endpoints: `POST /agent`, `GET /download/{id}`, `GET /health`, `/` → docs |
+| `app/orchestrator.py` | Core | The agent loop: plan → reflect → execute → assemble |
+| `app/schemas.py` | Core | Pydantic contracts — validates the LLM's plan, not just trusts it |
+| `app/llm.py` | Reliability | Groq client with retry + model fallback + JSON salvage |
+| `app/docgen.py` | Output | `python-docx` rendering (headings, bullets, numbered lists, tables, inline Markdown) |
+| `demo.py` | — | Runs both required test cases against the core, no server needed |
+
+**Tech:** Python · FastAPI · Groq (Llama 3.3 70B primary / 3.1 8B fallback, free tier) · python-docx · Pydantic.
 
 ---
 

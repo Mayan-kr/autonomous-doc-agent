@@ -16,7 +16,7 @@ Workflow:  PLAN  ->  REFLECT (self-check)  ->  EXECUTE  ->  ASSEMBLE
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, Iterator, List, Tuple
 
 from . import docgen, llm
 from .schemas import Plan, PlanStep
@@ -144,23 +144,54 @@ def write_section(
 
 
 # --------------------------------------------------------------------------- #
-# Orchestration entry point
+# Orchestration entry point (streaming)
 # --------------------------------------------------------------------------- #
-def run_agent(request: str) -> Dict:
-    """Full agent run. Returns a dict ready to shape into an AgentResponse."""
+def run_agent_events(request: str) -> Iterator[Dict]:
+    """Run the agent, yielding a progress event after each stage.
+
+    This is the streaming core used by the Streamlit UI to show the agent
+    "thinking" live. Event ``type`` is one of:
+
+      ``plan``    -> {"plan": Plan}                        after PLAN
+      ``reflect`` -> {"plan": Plan, "original": Plan,      after REFLECT
+                      "notes": str}
+      ``section`` -> {"index": int, "total": int,          after each section
+                      "title": str, "content": str}
+      ``done``    -> {"document_id", "plan", "sections",    after ASSEMBLE
+                      "reflection_notes", "message"}
+
+    ``run_agent`` (below) simply drains this generator, so the API and the UI
+    share one code path.
+    """
     # 1. Plan
     plan = make_plan(request)
+    yield {"type": "plan", "plan": plan}
 
     # 2. Reflect / self-check  (the improvement)
+    original_plan = plan
     plan, reflection_notes = reflect_on_plan(request, plan)
+    yield {
+        "type": "reflect",
+        "plan": plan,
+        "original": original_plan,
+        "notes": reflection_notes,
+    }
 
     # 3. Execute each planned step
     sections: List[Dict[str, str]] = []
     prior_titles: List[str] = []
+    total = len(plan.steps)
     for step in plan.steps:
         content = write_section(request, plan, step, prior_titles)
         sections.append({"title": step.title, "content": content})
         prior_titles.append(step.title)
+        yield {
+            "type": "section",
+            "index": len(sections),
+            "total": total,
+            "title": step.title,
+            "content": content,
+        }
 
     # 4. Assemble the .docx
     document_id = docgen.build_document(
@@ -171,7 +202,8 @@ def run_agent(request: str) -> Dict:
         sections=sections,
     )
 
-    return {
+    yield {
+        "type": "done",
         "message": (
             f"Generated a {len(sections)}-section {plan.document_type.lower()} "
             f"titled '{plan.title}'."
@@ -179,6 +211,24 @@ def run_agent(request: str) -> Dict:
         "request": request,
         "plan": plan,
         "reflection_notes": reflection_notes,
+        "sections": sections,
         "sections_generated": len(sections),
         "document_id": document_id,
+    }
+
+
+def run_agent(request: str) -> Dict:
+    """Full agent run. Returns a dict ready to shape into an AgentResponse."""
+    final: Dict = {}
+    for event in run_agent_events(request):
+        if event["type"] == "done":
+            final = event
+
+    return {
+        "message": final["message"],
+        "request": final["request"],
+        "plan": final["plan"],
+        "reflection_notes": final["reflection_notes"],
+        "sections_generated": final["sections_generated"],
+        "document_id": final["document_id"],
     }

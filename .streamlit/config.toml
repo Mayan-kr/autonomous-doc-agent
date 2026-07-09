@@ -1,0 +1,10 @@
+[theme]
+primaryColor = "#7C5CFF"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1D29"
+textColor = "#FAFAFA"
+font = "sans serif"
+
+[server]
+# Generated documents can be a few MB; keep uploads/downloads comfortable.
+maxUploadSize = 20

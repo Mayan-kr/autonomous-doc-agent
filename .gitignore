@@ -2,6 +2,7 @@
 .env
 credentails.txt
 credentials.txt
+.streamlit/secrets.toml
 
 # Generated documents
 output/

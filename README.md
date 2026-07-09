@@ -6,6 +6,13 @@ and produces a polished **Microsoft Word (.docx)** business document.
 
 Built for the *Python AI Engineer – Autonomous Agents – 60-Minute Build Challenge*.
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
+&nbsp;·&nbsp; **Two ways to run it:** a live **Streamlit web app** where you *watch the
+agent think*, or a **FastAPI** JSON endpoint.
+
+> ▶ **Try it live:** _add your Streamlit Community Cloud URL here after deploying
+> (takes ~2 minutes — see [Deploy](#deploy-free-on-streamlit-community-cloud))._
+
 ---
 
 ## What it does
@@ -103,9 +110,13 @@ the `.docx` from `output/`.
 | `app/schemas.py` | Core | Pydantic contracts — validates the LLM's plan, not just trusts it |
 | `app/llm.py` | Reliability | Groq client with retry + model fallback + JSON salvage |
 | `app/docgen.py` | Output | `python-docx` rendering (headings, bullets, numbered lists, tables, inline Markdown) |
+| `streamlit_app.py` | UI | Streamlit front-end that streams the agent's plan → reflect → write live |
 | `demo.py` | — | Runs both required test cases against the core, no server needed |
 
-**Tech:** Python · FastAPI · Groq (Llama 3.3 70B primary / 3.1 8B fallback, free tier) · python-docx · Pydantic.
+Both the Streamlit UI and the FastAPI endpoint call the **same** streaming core
+(`orchestrator.run_agent_events`) — the UI just renders each event as it arrives.
+
+**Tech:** Python · Streamlit · FastAPI · Groq (Llama 3.3 70B primary / 3.1 8B fallback, free tier) · python-docx · Pydantic.
 
 ---
 
@@ -150,6 +161,17 @@ copy .env.example .env            # then edit .env and paste your key
 # get one at https://console.groq.com/keys
 ```
 
+### Run the web app (recommended) 🌟
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Opens at **http://localhost:8501**. Type a request (or click an example), hit
+**Generate**, and watch the agent plan, critique its own plan with a visible
+before/after diff, write each section live, then hand you a **Download .docx**
+button. This is the version to screen-record for a demo.
+
 ### Run the two required test cases (no server needed)
 
 ```bash
@@ -177,6 +199,26 @@ curl -O -J http://127.0.0.1:8000/download/<document_id>
 ```
 
 Interactive docs (Swagger UI): open **http://127.0.0.1:8000/docs**.
+
+---
+
+## Deploy free on Streamlit Community Cloud
+
+No Docker, no server config — Streamlit builds straight from this repo.
+
+1. Push this repo to GitHub (already done if you're reading this there).
+2. Go to **[share.streamlit.io](https://share.streamlit.io/)** → **New app** → pick
+   this repo, branch `main`, main file **`streamlit_app.py`**.
+3. Open **Advanced settings → Secrets** and paste:
+   ```toml
+   GROQ_API_KEY = "gsk_your_key_here"
+   ```
+4. Click **Deploy**. You get a public `https://<your-app>.streamlit.app` URL in
+   ~2 minutes — drop it into the "Try it live" link at the top of this README.
+
+The app bridges Streamlit secrets into the environment at startup, so the exact
+same code runs locally (via `.env`) and in the cloud (via Secrets). See
+`.streamlit/secrets.toml.example` for the full list of keys.
 
 ---
 

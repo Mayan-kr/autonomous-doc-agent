@@ -71,15 +71,19 @@ EXAMPLES = {
 
 
 def _plan_summary(plan) -> None:
-    """Render a plan's metadata and section list."""
+    """Render a plan's metadata and section list.
+
+    Uses plain markdown (no st.expander) because this runs inside st.status,
+    which is itself an expander — Streamlit forbids nesting expanders.
+    """
     st.markdown(
         f"**{plan.title}**  \n"
         f"`{plan.document_type}` · for *{plan.audience}*"
     )
     if plan.assumptions:
-        with st.expander("Assumptions the agent made", expanded=False):
-            for a in plan.assumptions:
-                st.markdown(f"- {a}")
+        st.markdown("**Assumptions the agent made**")
+        for a in plan.assumptions:
+            st.markdown(f"- {a}")
     st.markdown("**Outline**")
     for step in plan.steps:
         st.markdown(f"{step.id}. {step.title}")

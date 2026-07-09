@@ -6,12 +6,11 @@ and produces a polished **Microsoft Word (.docx)** business document.
 
 Built for the *Python AI Engineer – Autonomous Agents – 60-Minute Build Challenge*.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://autonomous-doc-agent.streamlit.app/)
 &nbsp;·&nbsp; **Two ways to run it:** a live **Streamlit web app** where you *watch the
 agent think*, or a **FastAPI** JSON endpoint.
 
-> ▶ **Try it live:** _add your Streamlit Community Cloud URL here after deploying
-> (takes ~2 minutes — see [Deploy](#deploy-free-on-streamlit-community-cloud))._
+> ▶ **Try it live:** **https://autonomous-doc-agent.streamlit.app/**
 
 ---
 

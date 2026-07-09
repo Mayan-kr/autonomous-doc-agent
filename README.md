@@ -147,6 +147,9 @@ try/except that falls back to the original plan if the self-check ever fails.
 
 ## Setup & run
 
+# Requires Python 3.10–3.12 (built and tested on 3.12; the repo pins it via
+# .python-version). Avoid 3.13+ for now — some deps lack stable wheels there.
+
 ```bash
 # 1. Create a virtual environment (Python 3.12 recommended)
 py -3.12 -m venv .venv
@@ -209,7 +212,8 @@ No Docker, no server config — Streamlit builds straight from this repo.
 1. Push this repo to GitHub (already done if you're reading this there).
 2. Go to **[share.streamlit.io](https://share.streamlit.io/)** → **New app** → pick
    this repo, branch `main`, main file **`streamlit_app.py`**.
-3. Open **Advanced settings → Secrets** and paste:
+3. In **Advanced settings**, set **Python version → 3.12** (what this project is
+   built and tested on), then under **Secrets** paste:
    ```toml
    GROQ_API_KEY = "gsk_your_key_here"
    ```
